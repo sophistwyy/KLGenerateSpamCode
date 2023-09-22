@@ -624,7 +624,7 @@ void generateSwiftSpamCodeFile(NSString *outDirectory, NSString *swiftFilePath) 
                 funcName = [NSString stringWithFormat:@"%@%@", funcName, randomString(5)];
                 [methodsString appendFormat:kSwiftMethodTemplate, wrapperSapce(funcName), wrapperSapce(gOutParameterName.capitalizedString), gOutParameterName, oldParameterName, gOutParameterName];
                 
-                NSLog(@"方法名称：%@",methodsString);
+//                NSLog(@"方法名称：%@",methodsString);
             } else {
                 NSLog(@"string contains `[` or `]` bla! funcName: %@", funcName);
             }
