@@ -37,17 +37,26 @@ static NSString * const kNewClassDirName = @"NewClass";
 
 #pragma mark - 公共方法
 
-static const NSString *kRandomAlphabet = @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+static const NSString *kRandomAlphabet = @"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 NSString *randomString(NSInteger length) {
     NSMutableString *ret = [NSMutableString stringWithCapacity:length];
     for (int i = 0; i < length; i++) {
         [ret appendFormat:@"%C", [kRandomAlphabet characterAtIndex:arc4random_uniform((uint32_t)[kRandomAlphabet length])]];
     }
-    return ret;
+    return [ret stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 }
 
 NSString *randomLetter() {
-    return [NSString stringWithFormat:@"%C", [kRandomAlphabet characterAtIndex:arc4random_uniform(52)]];
+    NSString *letter = [NSString stringWithFormat:@"%C", [kRandomAlphabet characterAtIndex:arc4random_uniform(52)]];
+    // 去除可能的空格
+    return [letter stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+}
+
+NSString *wrapperSapce(NSString *content) {
+    if (!content) {
+        return @"";
+    }
+    return [content stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 }
 
 NSRange getOutermostCurlyBraceRange(NSString *string, unichar beginChar, unichar endChar, NSInteger beginIndex) {
@@ -428,6 +437,7 @@ void generateSpamCodeFile(NSString *outDirectory, NSString *mFilePath, GSCSource
     
     [matches enumerateObjectsUsingBlock:^(NSTextCheckingResult * _Nonnull impResult, NSUInteger idx, BOOL * _Nonnull stop) {
         NSString *className = [mFileContent substringWithRange:[impResult rangeAtIndex:1]];
+        className = [className stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
         NSString *categoryName = nil;
         NSString *newClassName = [NSString stringWithFormat:@"%@%@%@", gOutParameterName, className, randomLetter()];
         if (impResult.numberOfRanges >= 3) {
@@ -556,6 +566,12 @@ void generateSpamCodeFile(NSString *outDirectory, NSString *mFilePath, GSCSource
     }];
 }
 
+NSString *cleanFunctionName(NSString *originalFunctionName) {
+    // 去除函数名称中的空格
+    NSString *cleanedName = [originalFunctionName stringByReplacingOccurrencesOfString:@" " withString:@""];
+    return cleanedName;
+}
+
 static NSString *const kSwiftFileTemplate = @"\
 %@\n\
 extension %@ {\n%@\
@@ -591,10 +607,13 @@ void generateSwiftSpamCodeFile(NSString *outDirectory, NSString *swiftFilePath) 
         NSArray<NSTextCheckingResult *> *matches = [expression matchesInString:classContent options:0 range:NSMakeRange(0, classContent.length)];
         if (matches.count <= 0) return;
         
-        NSMutableString *methodsString = [NSMutableString string];
+       __block NSMutableString *methodsString = [NSMutableString string];
         [matches enumerateObjectsUsingBlock:^(NSTextCheckingResult * _Nonnull funcResult, NSUInteger idx, BOOL * _Nonnull stop) {
             NSRange funcNameRange = [funcResult rangeAtIndex:1];
             NSString *funcName = [classContent substringWithRange:funcNameRange];
+            // 使用cleanFunctionName函数去除空格
+            funcName = cleanFunctionName(funcName);
+
             NSRange oldParameterRange = getOutermostCurlyBraceRange(classContent, '(', ')', funcNameRange.location + funcNameRange.length);
             NSString *oldParameterName = [classContent substringWithRange:oldParameterRange];
             oldParameterName = [oldParameterName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -603,7 +622,9 @@ void generateSwiftSpamCodeFile(NSString *outDirectory, NSString *swiftFilePath) 
             }
             if (![funcName containsString:@"<"] && ![funcName containsString:@">"]) {
                 funcName = [NSString stringWithFormat:@"%@%@", funcName, randomString(5)];
-                [methodsString appendFormat:kSwiftMethodTemplate, funcName, gOutParameterName.capitalizedString, gOutParameterName, oldParameterName, gOutParameterName];
+                [methodsString appendFormat:kSwiftMethodTemplate, wrapperSapce(funcName), wrapperSapce(gOutParameterName.capitalizedString), gOutParameterName, oldParameterName, gOutParameterName];
+                
+                NSLog(@"方法名称：%@",methodsString);
             } else {
                 NSLog(@"string contains `[` or `]` bla! funcName: %@", funcName);
             }
@@ -862,6 +883,7 @@ void modifyFilesClassName(NSString *sourceCodeDir, NSString *oldClassName, NSStr
             NSError *error = nil;
             NSMutableString *fileContent = [NSMutableString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
             if (error) {
+                
                 printf("打开文件 %s 失败：%s\n", path.UTF8String, error.localizedDescription.UTF8String);
                 abort();
             }
